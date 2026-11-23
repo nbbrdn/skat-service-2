@@ -9,7 +9,9 @@ Django 6.1.3 + PostgreSQL + Django Templates + HTMX + Bootstrap 5. The first inc
 5. Users see only their own order history and order details.
 6. Admins inspect all orders and their line items in Django Admin (read-only).
 
-## Run using Docker (recommended on Ubuntu 24.04)
+Production deployment on Ubuntu 24.04 is documented in [Deployment](docs/deployment.md).
+
+## Run using Docker for development
 
 Requirements: Docker Engine and `docker compose` plugin. On your machine:
 

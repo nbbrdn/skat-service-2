@@ -9,3 +9,7 @@ staticfiles/
 .idea/
 .vscode/
 .DS_Store
+
+.env.*
+!.env.example
+!deploy/.env.prod.example

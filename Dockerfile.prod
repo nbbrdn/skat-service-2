@@ -1,0 +1,27 @@
+FROM python:3.13-slim
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+WORKDIR /app
+
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt \
+    && groupadd --gid 10001 app \
+    && useradd --uid 10001 --gid app --no-create-home app \
+    && install -d -o app -g app /app/staticfiles
+
+COPY manage.py ./
+COPY config/ config/
+COPY orders/ orders/
+COPY parts/ parts/
+COPY static/ static/
+COPY templates/ templates/
+COPY deploy/gunicorn.conf.py ./gunicorn.conf.py
+
+RUN chmod -R u=rwX,go=rX /app
+
+USER app
+# collectstatic needs Django settings, but no runtime key or database connection.
+RUN DJANGO_SECRET_KEY="$(python -c 'from secrets import token_urlsafe; print(token_urlsafe(64))')" \
+    python manage.py collectstatic --noinput
+
+EXPOSE 8000
+CMD ["gunicorn", "--config", "gunicorn.conf.py", "config.wsgi:application"]
