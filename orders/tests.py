@@ -1,0 +1,136 @@
+from decimal import Decimal
+from django.contrib.auth import get_user_model
+from django.test import Client, TestCase
+from django.urls import reverse
+from parts.models import Part
+from .models import Order, OrderItem
+
+User = get_user_model()
+
+class ShopTests(TestCase):
+    def setUp(self):
+        self.alice = User.objects.create_user("alice", password="safe-password-123")
+        self.bob = User.objects.create_user("bob", password="safe-password-123")
+        self.part = Part.objects.create(name="Корпус", price=Decimal("125.50"))
+        self.other = Part.objects.create(name="Винт", price=Decimal("10.00"))
+
+    def login_alice(self):
+        self.client.force_login(self.alice)
+
+    def add(self, part=None, qty=1):
+        return self.client.post(reverse("orders:add", args=[(part or self.part).pk]), {"quantity": qty})
+
+    def checkout(self):
+        return self.client.post(reverse("orders:checkout"))
+
+    def test_auth_required(self):
+        for name in ("parts:list", "orders:cart", "orders:history"):
+            self.assertEqual(self.client.get(reverse(name)).status_code, 302)
+        self.assertEqual(self.add().status_code, 302)
+        self.assertFalse(Order.objects.exists())
+
+    def test_add_with_quantity_and_cart_total(self):
+        self.login_alice()
+        self.add(qty=3)
+        self.add(part=self.other, qty=2)
+        response = self.client.get(reverse("orders:cart"))
+        self.assertContains(response, "396,50")
+        self.assertEqual(self.client.session["cart"], {str(self.part.pk): 3, str(self.other.pk): 2})
+
+    def test_add_increment_and_limit(self):
+        self.login_alice()
+        self.add(qty=998)
+        self.assertEqual(self.add(qty=2).status_code, 400)
+        self.assertEqual(self.client.session["cart"][str(self.part.pk)], 998)
+
+    def test_update_and_delete(self):
+        self.login_alice()
+        self.add()
+        url = reverse("orders:update", args=[self.part.pk])
+        self.client.post(url, {"quantity": 7})
+        self.assertEqual(self.client.session["cart"][str(self.part.pk)], 7)
+        self.assertEqual(self.client.post(url, {"quantity": 0}).status_code, 400)
+        self.client.post(reverse("orders:remove", args=[self.part.pk]))
+        self.assertEqual(self.client.session["cart"], {})
+
+    def test_checkout_saves_price_and_name_snapshots(self):
+        self.login_alice()
+        self.add(qty=2)
+        self.checkout()
+        order = Order.objects.get()
+        self.assertEqual(order.user, self.alice)
+        self.assertEqual(order.total_amount, Decimal("251.00"))
+        item = order.items.get()
+        self.assertEqual((item.part_name, item.unit_price, item.quantity), ("Корпус", Decimal("125.50"), 2))
+        self.assertEqual(self.client.session["cart"], {})
+        self.part.name = "Новое название"
+        self.part.price = Decimal("500.00")
+        self.part.save()
+        order.refresh_from_db()
+        item.refresh_from_db()
+        self.assertEqual(order.total_amount, Decimal("251.00"))
+        self.assertEqual(item.part_name, "Корпус")
+        self.assertEqual(item.unit_price, Decimal("125.50"))
+
+    def test_checkout_uses_server_prices(self):
+        self.login_alice()
+        self.client.post(reverse("orders:add", args=[self.part.pk]), {"quantity": 1, "price": "0.01"})
+        self.client.post(reverse("orders:checkout"), {"total_amount": "0.01"})
+        self.assertEqual(Order.objects.get().total_amount, Decimal("125.50"))
+
+    def test_empty_checkout_does_not_create_order(self):
+        self.login_alice()
+        self.checkout()
+        self.assertFalse(Order.objects.exists())
+
+    def test_checkout_cannot_be_submitted_with_get(self):
+        self.login_alice()
+        self.assertEqual(self.client.get(reverse("orders:checkout")).status_code, 405)
+
+    def test_only_own_order_visible(self):
+        self.login_alice()
+        self.add()
+        self.checkout()
+        order = Order.objects.get()
+        self.client.force_login(self.bob)
+        self.assertEqual(self.client.get(reverse("orders:detail", args=[order.pk])).status_code, 404)
+        history = self.client.get(reverse("orders:history"))
+        self.assertNotContains(history, f"№ {order.pk}")
+
+    def test_order_survives_deleted_part(self):
+        self.login_alice()
+        self.add()
+        self.checkout()
+        self.part.delete()
+        item = OrderItem.objects.get()
+        self.assertIsNone(item.part)
+        self.assertEqual(item.part_name, "Корпус")
+
+    def test_htmx_cart_edit_returns_fragment(self):
+        self.login_alice()
+        self.add(qty=2)
+        response = self.client.post(reverse("orders:update", args=[self.part.pk]), {"quantity": 3}, HTTP_HX_REQUEST="true")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="cart-main"')
+        self.assertContains(response, 'hx-swap-oob="outerHTML"')
+
+    def test_product_not_found_add_returns_404(self):
+        self.login_alice()
+        self.assertEqual(self.client.post(reverse("orders:add", args=[999999]), {"quantity": 1}).status_code, 404)
+
+    def test_csrf_protects_cart_add(self):
+        client = Client(enforce_csrf_checks=True)
+        client.force_login(self.alice)
+        response = client.post(reverse("orders:add", args=[self.part.pk]), {"quantity": 1})
+        self.assertEqual(response.status_code, 403)
+
+    def test_admin_lists_submitted_orders(self):
+        admin = User.objects.create_superuser("admin", "admin@example.org", "safe-password-123")
+        self.login_alice()
+        self.add(qty=2)
+        self.checkout()
+        self.client.force_login(admin)
+        response = self.client.get(reverse("admin:orders_order_changelist"))
+        self.assertContains(response, "alice")
+        self.assertContains(response, "251")
+

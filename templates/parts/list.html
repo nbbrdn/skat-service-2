@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Каталог запчастей{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-3">
+  <h1 class="h3 mb-0">Запчасти</h1>
+  <form method="get" class="d-flex gap-2"><input name="q" value="{{ query }}" class="form-control" placeholder="Поиск по названию"><button class="btn btn-outline-secondary">Найти</button></form>
+</div>
+<div id="cart-feedback" aria-live="polite"></div>
+<div class="table-responsive">
+<table class="table table-hover align-middle">
+<thead><tr><th>Запчасть</th><th class="text-end">Цена</th><th>Количество</th><th></th></tr></thead>
+<tbody>
+{% for part in parts %}
+<tr>
+  <td>{{ part.name }}</td><td class="text-end text-nowrap">{{ part.price|floatformat:2 }} ₽</td>
+  <td colspan="2">
+    <form method="post" action="{% url 'orders:add' part.pk %}" hx-post="{% url 'orders:add' part.pk %}" hx-target="#cart-feedback" hx-swap="innerHTML" class="d-flex flex-wrap gap-2">
+      {% csrf_token %}
+      <input class="form-control quantity" aria-label="Количество" name="quantity" type="number" min="1" max="999" step="1" value="1" required>
+      <button class="btn btn-sm btn-primary" type="submit">В корзину</button>
+    </form>
+  </td>
+</tr>
+{% empty %}
+<tr><td colspan="4" class="text-muted">Запчастей пока нет.</td></tr>
+{% endfor %}
+</tbody></table></div>
+{% endblock %}

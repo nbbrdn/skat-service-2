@@ -1,0 +1,33 @@
+<div id="cart-main">
+{% if rows %}
+  <div class="table-responsive"><table class="table align-middle">
+    <thead><tr><th>Запчасть</th><th class="text-end">Цена</th><th>Количество</th><th class="text-end">Сумма</th><th></th></tr></thead>
+    <tbody>
+    {% for row in rows %}
+      <tr>
+        <td>{{ row.part.name }}</td>
+        <td class="text-end text-nowrap">{{ row.part.price|floatformat:2 }} ₽</td>
+        <td>
+          <form method="post" action="{% url 'orders:update' row.part.pk %}" hx-post="{% url 'orders:update' row.part.pk %}" hx-target="#cart-main" hx-swap="outerHTML" class="d-flex align-items-center gap-2">
+            {% csrf_token %}<input class="form-control quantity" type="number" aria-label="Количество" name="quantity" value="{{ row.quantity }}" min="1" max="999" step="1" required>
+            <button class="btn btn-outline-secondary btn-sm" type="submit">Сохранить</button>
+          </form>
+        </td>
+        <td class="text-end text-nowrap">{{ row.subtotal|floatformat:2 }} ₽</td>
+        <td>
+          <form method="post" action="{% url 'orders:remove' row.part.pk %}" hx-post="{% url 'orders:remove' row.part.pk %}" hx-target="#cart-main" hx-swap="outerHTML">
+            {% csrf_token %}<button class="btn btn-outline-danger btn-sm" type="submit" aria-label="Удалить">Удалить</button>
+          </form>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mt-4">
+    <strong class="h4 mb-0">Итого: {{ total|floatformat:2 }} ₽</strong>
+    <form method="post" action="{% url 'orders:checkout' %}">{% csrf_token %}<button class="btn btn-success btn-lg">Заказать</button></form>
+  </div>
+{% else %}
+  <div class="alert alert-secondary">Корзина пуста. <a href="{% url 'parts:list' %}">Перейти к каталогу</a>.</div>
+{% endif %}
+</div>

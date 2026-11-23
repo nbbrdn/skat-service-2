@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Заказ №{{ order.pk }}{% endblock %}
+{% block content %}
+<h1 class="h3">Заказ №{{ order.pk }}</h1>
+<p class="text-muted">Оформлен {{ order.created_at|date:"d.m.Y H:i" }}</p>
+<div class="table-responsive"><table class="table align-middle">
+<thead><tr><th>Запчасть</th><th class="text-end">Цена</th><th class="text-end">Количество</th><th class="text-end">Сумма</th></tr></thead>
+<tbody>{% for item in order.items.all %}
+<tr><td>{{ item.part_name }}</td><td class="text-end">{{ item.unit_price|floatformat:2 }} ₽</td><td class="text-end">{{ item.quantity }}</td><td class="text-end">{{ item.line_total|floatformat:2 }} ₽</td></tr>
+{% endfor %}</tbody></table></div>
+<div class="text-end h4">Итого: {{ order.total_amount|floatformat:2 }} ₽</div>
+<a class="btn btn-outline-primary" href="{% url 'orders:history' %}">К истории заказов</a>
+{% endblock %}

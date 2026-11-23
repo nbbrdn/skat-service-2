@@ -1,0 +1,4 @@
+body { background: #fafbfc; }
+.quantity { width: 88px; min-width: 88px; }
+.table td { vertical-align: middle; }
+main { max-width: 1120px; }
