@@ -4,7 +4,7 @@ Django 6.1.3 + PostgreSQL + Django Templates + HTMX + Bootstrap 5. The first inc
 
 1. Users are created by admins in Django Admin.
 2. Admins create parts with name and price.
-3. Authorized users browse/search parts and add arbitrary quantities to a cart.
+3. Authorized users browse/search parts and add up to 999 units of each part to a cart.
 4. The cart supports updating quantities, deleting rows, and checkout.
 5. Users see only their own order history and order details.
 6. Admins inspect all orders and their line items in Django Admin (read-only).
@@ -23,8 +23,9 @@ Put the generated string in `DJANGO_SECRET_KEY` in `.env`. Replace `POSTGRES_PAS
 ```bash
 docker compose up -d --build
 docker compose exec web python manage.py createsuperuser
-docker compose exec web python manage.py test
 ```
+
+The web container applies migrations at startup.
 
 Web app: http://localhost:8000/login/ ; order history: http://localhost:8000/orders/ ; admin: http://localhost:8000/admin/ .
 Ports bind **only to 127.0.0.1**, so on a remote VM use an SSH tunnel:
@@ -37,20 +38,23 @@ Then visit http://localhost:8000 on your own computer. Create regular accounts u
 
 ## Run locally without Docker
 
-Requires Python 3.13 and pip. This mode uses SQLite for development only:
+Use Python 3.13 with SQLite for local development. Django reads the environment directly. The `.env` file is used by Docker Compose. Ensure `DATABASE_ENGINE` is set to `sqlite` when running locally.
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-export DJANGO_DEBUG=1        # Windows PowerShell: $env:DJANGO_DEBUG="1"
+python3.13 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+export DJANGO_DEBUG=1 DATABASE_ENGINE=sqlite
 python manage.py migrate
 python manage.py createsuperuser
 python manage.py runserver
-python manage.py test
 ```
 
-## Architecture and deliberately omitted features
+On Windows PowerShell, use `py -3.13 -m venv .venv` and activate with `.\.venv\Scripts\Activate.ps1`. Set `$env:DJANGO_DEBUG = "1"` and `$env:DATABASE_ENGINE = "sqlite"` before running Django commands.
+
+## Architecture
+
+See [Architecture](docs/architecture.md) for the data model, session cart and checkout flow.
 
 - Django built-in User (no self-registration) and session authentication.
 - Parts: name, price. No SKU, stock, groups or file attachments yet.
@@ -62,11 +66,19 @@ python manage.py test
 
 ## Tests
 
-Run `python manage.py test` in a Python environment with requirements installed.
+Run the same checks as GitHub Actions in the local environment configured above.
+
+```bash
+python manage.py check
+python manage.py makemigrations --check --dry-run
+python manage.py test
+```
+
+To verify with PostgreSQL, prefix each command with `docker compose exec web`. Django creates a separate test database, so the configured PostgreSQL user needs permission to create databases.
 
 ## Next planned iterations (not implemented)
 
 - Parts categories and search/filter refinement.
 - Equipment models, assembly diagrams and diagram positions.
 - Orders lifecycle, admin order processing, notifications and integrations.
-- Import from external systems, APIs and advanced access roles.
+- Integration with 1C, external APIs and advanced access roles.
