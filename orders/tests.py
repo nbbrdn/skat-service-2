@@ -1,8 +1,10 @@
+from datetime import timedelta
 from decimal import Decimal
 from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
 from django.urls import reverse
-from parts.models import Part
+from django.utils import timezone
+from parts.models import Part, StockBalance, SyncState
 from .models import Order, OrderItem
 
 User = get_user_model()
@@ -102,6 +104,7 @@ class ShopTests(TestCase):
         self.assertNotContains(history, f"№ {order.pk}")
 
     def test_order_survives_deleted_part(self):
+        balance = StockBalance.objects.create(part=self.part, quantity="1")
         self.login_alice()
         self.add()
         self.checkout()
@@ -109,6 +112,9 @@ class ShopTests(TestCase):
         item = OrderItem.objects.get()
         self.assertIsNone(item.part)
         self.assertEqual(item.part_name, "Корпус")
+        self.assertEqual(item.unit_price, Decimal("125.50"))
+        self.assertEqual(item.order.total_amount, Decimal("125.50"))
+        self.assertFalse(StockBalance.objects.filter(pk=balance.pk).exists())
 
     def test_htmx_cart_edit_returns_fragment(self):
         self.login_alice()
@@ -249,3 +255,31 @@ class ShopTests(TestCase):
         self.assertEqual(self.client.post(url, {"total_amount": "0.01"}).status_code, 403)
         order.refresh_from_db()
         self.assertEqual(order.total_amount, self.part.price)
+
+    def test_checkout_ignores_stock_and_activity(self):
+        self.login_alice()
+        self.part.is_active = False
+        self.part.save(update_fields=["is_active"])
+        now = timezone.now()
+        sync = SyncState.objects.create(kind=SyncState.Kind.STOCK, last_success_at=now)
+
+        for quantity, sync_at in [
+            (None, now),
+            ("1.250", now),
+            ("0", now),
+            ("-1", now),
+            ("1.250", now - timedelta(hours=1)),
+        ]:
+            with self.subTest(quantity=quantity, sync_at=sync_at):
+                if quantity is not None:
+                    StockBalance.objects.update_or_create(part=self.part, defaults={"quantity": quantity})
+                sync.last_success_at = sync_at
+                sync.save(update_fields=["last_success_at"])
+                self.assertRedirects(self.add(qty=3), reverse("parts:list"))
+                response = self.checkout()
+                item = OrderItem.objects.latest("pk")
+                self.assertRedirects(response, reverse("orders:detail", args=[item.order_id]))
+                self.assertEqual(item.quantity, 3)
+                self.assertEqual(item.order.total_amount, Decimal("376.50"))
+                self.assertEqual(self.client.session["cart"], {})
+        self.assertEqual(Order.objects.count(), 5)

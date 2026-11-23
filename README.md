@@ -3,7 +3,7 @@
 Django 6.1.3 + PostgreSQL + Django Templates + HTMX + Bootstrap 5. The first increment implements:
 
 1. Users are created by admins in Django Admin.
-2. Admins create parts with name and price.
+2. Admins manage parts and exact stock balances for one warehouse.
 3. Authorized users browse/search parts and add up to 999 units of each part to a cart.
 4. The cart supports updating quantities, deleting rows, and checkout.
 5. Users see only their own order history and order details.
@@ -57,12 +57,20 @@ On Windows PowerShell, use `py -3.13 -m venv .venv` and activate with `.\.venv\S
 See [Architecture](docs/architecture.md) for the data model, session cart and checkout flow.
 
 - Django built-in User (no self-registration) and session authentication.
-- Parts: name, price. No SKU, stock, groups or file attachments yet.
+- Parts store a name, price, optional unique 1C nomenclature GUID, optional text code and an activity flag. Groups and file attachments are planned.
 - Session cart with quantity 1..999. Prices are **never** accepted from browser input.
 - On checkout, new Order + OrderItem snapshots are saved atomically, including item name, price and quantity. History survives edits/deletions of catalog parts.
 - Orders are read-only in Django Admin; no statuses, payment processing, stock reservation, emails or external API yet.
 - No separate frontend build step; HTML forms work without JavaScript, HTMX enhances updates. Bootstrap/HTMX are currently loaded from public CDNs. Bundle them locally before offline or restricted-network production use.
 - Docker Compose launches Django's *development* `runserver`, not a production-ready HTTP stack. Before publishing: DEBUG=0, hardened Nginx+Gunicorn, HTTPS, static files, backups, logging, rate limiting and proper ALLOWED_HOSTS/CSRF_TRUSTED_ORIGINS. No Docker publication port is exposed to the internet in this MVP.
+
+## Stock availability
+
+`StockBalance` stores one part's balance for a single warehouse, with three decimal places and optional source metadata. A missing balance or a null quantity means the quantity is unknown. Staff with the relevant permissions can manage exact balances in Django Admin and view the global synchronization state.
+
+The catalog shows **В наличии** for a positive balance and **Нет в наличии** for a zero or negative balance when the global stock synchronization succeeded within `STOCK_SYNC_MAX_AGE_MINUTES` (15 minutes by default). Missing, unknown or stale data displays **Наличие уточняется**. Customers see only these labels and can order regardless of availability or the activity flag.
+
+`SyncState.last_success_at` can be set from Django shell for a test or demo. The HTTP API for 1C and scheduled synchronization are planned. See [the architecture documentation](docs/architecture.md) for details.
 
 ## Tests
 

@@ -8,11 +8,18 @@
 <div id="cart-feedback" aria-live="polite"></div>
 <div class="table-responsive">
 <table class="table table-hover align-middle">
-<thead><tr><th>Запчасть</th><th class="text-end">Цена</th><th>Количество</th><th></th></tr></thead>
+<thead><tr><th>Запчасть</th><th class="text-end">Цена</th><th>Наличие</th><th>Количество</th><th></th></tr></thead>
 <tbody>
 {% for part in parts %}
 <tr>
-  <td>{{ part.name }}</td><td class="text-end text-nowrap">{{ part.price|floatformat:2 }} ₽</td>
+  <td>
+    {{ part.name }}
+    {% if part.code %}<div class="small text-muted">Код 1С {{ part.code }}</div>{% endif %}
+  </td>
+  <td class="text-end text-nowrap">{{ part.price|floatformat:2 }} ₽</td>
+  <td>
+    <span class="badge {% if part.availability == 'В наличии' %}text-bg-success{% elif part.availability == 'Нет в наличии' %}text-bg-danger{% else %}text-bg-secondary{% endif %}">{{ part.availability }}</span>
+  </td>
   <td colspan="2">
     <form method="post" action="{% url 'orders:add' part.pk %}" hx-post="{% url 'orders:add' part.pk %}" hx-target="#cart-feedback" hx-swap="innerHTML" class="d-flex flex-wrap gap-2">
       {% csrf_token %}
@@ -22,7 +29,7 @@
   </td>
 </tr>
 {% empty %}
-<tr><td colspan="4" class="text-muted">Запчастей пока нет.</td></tr>
+<tr><td colspan="5" class="text-muted">Запчастей пока нет.</td></tr>
 {% endfor %}
 </tbody></table></div>
 {% endblock %}

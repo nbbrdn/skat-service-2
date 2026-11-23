@@ -67,6 +67,7 @@ LANGUAGE_CODE = "ru"
 TIME_ZONE = "Asia/Vladivostok"
 USE_I18N = True
 USE_TZ = True
+STOCK_SYNC_MAX_AGE_MINUTES = 15
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_DIRS = [BASE_DIR / "static"]
