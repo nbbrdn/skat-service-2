@@ -1,4 +1,4 @@
-from .cart import get_cart
+from .cart import MAX_QUANTITY, get_cart
 
 def cart_count(request):
     count = 0
@@ -7,6 +7,6 @@ def cart_count(request):
             quantity = int(value)
         except (ValueError, TypeError):
             continue
-        if 1 <= quantity <= 999:
+        if 1 <= quantity <= MAX_QUANTITY:
             count += quantity
     return {"cart_count": count}

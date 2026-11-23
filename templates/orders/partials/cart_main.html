@@ -1,4 +1,11 @@
 <div id="cart-main">
+{% for pk in missing_ids %}
+  <form method="post" action="{% url 'orders:remove' pk %}" hx-post="{% url 'orders:remove' pk %}" hx-target="#cart-main" hx-swap="outerHTML" class="alert alert-warning">
+    {% csrf_token %}
+    Запчасть №{{ pk }} удалена из каталога.
+    <button class="btn btn-outline-danger btn-sm" type="submit">Удалить из корзины</button>
+  </form>
+{% endfor %}
 {% if rows %}
   <div class="table-responsive"><table class="table align-middle">
     <thead><tr><th>Запчасть</th><th class="text-end">Цена</th><th>Количество</th><th class="text-end">Сумма</th><th></th></tr></thead>
@@ -25,9 +32,15 @@
   </table></div>
   <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mt-4">
     <strong class="h4 mb-0">Итого: {{ total|floatformat:2 }} ₽</strong>
-    <form method="post" action="{% url 'orders:checkout' %}">{% csrf_token %}<button class="btn btn-success btn-lg">Заказать</button></form>
+    {% if not missing_ids %}
+    <form method="post" action="{% url 'orders:checkout' %}">
+      {% csrf_token %}
+      <input type="hidden" name="checkout_token" value="{{ checkout_token }}">
+      <button class="btn btn-success btn-lg">Заказать</button>
+    </form>
+    {% endif %}
   </div>
-{% else %}
+{% elif not missing_ids %}
   <div class="alert alert-secondary">Корзина пуста. <a href="{% url 'parts:list' %}">Перейти к каталогу</a>.</div>
 {% endif %}
 </div>

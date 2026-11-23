@@ -8,6 +8,8 @@ class Order(models.Model):
     created_at = models.DateTimeField("Оформлен", auto_now_add=True)
     total_amount = models.DecimalField("Сумма, ₽", max_digits=18, decimal_places=2, default=Decimal("0.00"))
 
+    checkout_token = models.UUIDField(null=True, unique=True, editable=False)
+
     class Meta:
         verbose_name = "Заказ"
         verbose_name_plural = "Заказы"
