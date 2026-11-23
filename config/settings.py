@@ -5,7 +5,14 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 DEBUG = os.getenv("DJANGO_DEBUG", "0") == "1"
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "development-only-unsafe-secret" if DEBUG else "")
 if not SECRET_KEY:
-    raise RuntimeError("Set DJANGO_SECRET_KEY (and DJANGO_DEBUG=1 for local development).")
+    raise RuntimeError("Set DJANGO_SECRET_KEY (or DJANGO_DEBUG=1 for local development).")
+
+if not DEBUG and (
+    len(SECRET_KEY) < 50
+    or len(set(SECRET_KEY)) < 5
+    or SECRET_KEY.lower().startswith(("django-insecure-", "development-", "test-", "change-me", "replace-me"))
+):
+    raise RuntimeError("Set DJANGO_SECRET_KEY to a unique random value of at least 50 characters.")
 
 ALLOWED_HOSTS = [value.strip() for value in os.getenv("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if value.strip()]
 CSRF_TRUSTED_ORIGINS = [value.strip() for value in os.getenv("DJANGO_CSRF_TRUSTED_ORIGINS", "").split(",") if value.strip()]
@@ -68,7 +75,7 @@ TIME_ZONE = "Asia/Vladivostok"
 USE_I18N = True
 USE_TZ = True
 STOCK_SYNC_MAX_AGE_MINUTES = 15
-STATIC_URL = "static/"
+STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
@@ -81,6 +88,31 @@ CSRF_COOKIE_SAMESITE = "Lax"
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = "DENY"
 if not DEBUG:
+    if not ALLOWED_HOSTS or any(host.startswith(("*", ".")) for host in ALLOWED_HOSTS):
+        raise RuntimeError("Set DJANGO_ALLOWED_HOSTS to specific hostnames.")
+
+    MIDDLEWARE.insert(1, "whitenoise.middleware.WhiteNoiseMiddleware")
+    STORAGES = {
+        "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+        "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
+    }
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SECURE_SSL_REDIRECT = True
+    SECURE_HSTS_SECONDS = int(os.getenv("DJANGO_HSTS_SECONDS", "3600"))
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = False
+    SECURE_HSTS_PRELOAD = False
+
+    LOGGING = {
+        "version": 1,
+        "disable_existing_loggers": False,
+        "handlers": {"console": {"class": "logging.StreamHandler"}},
+        "loggers": {
+            "django": {
+                "handlers": ["console"],
+                "level": os.getenv("DJANGO_LOG_LEVEL", "INFO"),
+                "propagate": False,
+            },
+        },
+    }

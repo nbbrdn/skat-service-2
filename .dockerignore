@@ -4,3 +4,11 @@
 __pycache__
 *.sqlite3
 staticfiles
+
+**/.env
+**/.env.*
+**/.venv
+**/venv
+**/__pycache__
+**/*.sqlite3*
+.git*
